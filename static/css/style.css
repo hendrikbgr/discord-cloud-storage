@@ -1,0 +1,30 @@
+/* static/css/style.css */
+
+body {
+  background: linear-gradient(
+    to right,
+    #8e9eab,
+    #eef2f3
+  ); /* Updated gradient colors */
+  margin: 0;
+  font-family: "Arial", sans-serif;
+}
+
+.glass-morphism {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border-radius: 15px;
+}
+
+.table {
+  color: #000;
+}
+
+.btn-primary {
+  background: #3498db;
+  border: none;
+}
+
+.btn-primary:hover {
+  background: #2980b9;
+}
