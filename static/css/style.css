@@ -1,13 +1,24 @@
 /* static/css/style.css */
 
+html,
+body {
+  height: 100%;
+}
+
 body {
   background: linear-gradient(
-    to right,
-    #8e9eab,
-    #eef2f3
-  ); /* Updated gradient colors */
+    to right top,
+    #051937,
+    #004d7a,
+    #008793,
+    #00bf72,
+    #a8eb12
+  );
   margin: 0;
   font-family: "Arial", sans-serif;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .glass-morphism {
@@ -16,15 +27,38 @@ body {
   border-radius: 15px;
 }
 
-.table {
+.glass-input {
+  background: rgba(255, 255, 255, 0.3);
+  backdrop-filter: blur(5px);
+  border: none;
+  border-radius: 8px;
+  color: #fff; /* Changed text color to white */
+}
+
+.glass-input::placeholder {
+  color: #fff; /* Placeholder text color */
+}
+
+.glass-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+}
+
+.glass-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.glass-table {
+  background: rgba(255, 255, 255, 0.3);
+  backdrop-filter: blur(5px);
+  border-radius: 15px;
   color: #000;
 }
 
-.btn-primary {
-  background: #3498db;
-  border: none;
-}
-
-.btn-primary:hover {
-  background: #2980b9;
+.table {
+  --bs-table-bg: rgb(255 255 255 / 3%);
+  border-color: rgb(255 255 255 / 0%);
+  --bs-table-color: white;
 }

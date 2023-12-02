@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, send_file, redirect, url_for
+from flask import Flask, render_template, request, send_file, redirect, url_for, after_this_request
 from Crypto.Cipher import AES
 from Crypto.Random import get_random_bytes
 import os
@@ -36,7 +36,8 @@ def index():
 
     files_info = asyncio.run(fetch_file_information())
 
-    return render_template('index.html', files_info=files_info)
+
+    return render_template('index.html',files_info=files_info)
 
 def convert_bytes(byte_size):
     for unit in ['B', 'KB', 'MB', 'GB']:
@@ -127,7 +128,7 @@ def download_and_decrypt(file_id):
 
     chunks_urls = chunk_list.split(', ')
 
-    num_threads = request.args.get('num_threads', default=1, type=int)
+    num_threads = request.args.get('num_threads', default=4, type=int)
 
     # Using ThreadPoolExecutor for concurrent downloading
     with concurrent.futures.ThreadPoolExecutor(max_workers=num_threads) as executor:
@@ -138,17 +139,26 @@ def download_and_decrypt(file_id):
         decrypt_and_reassemble(downloaded_chunks, file_name, key_hex)
         conn.close()
         decrypted_file_path = os.path.join(os.getcwd(), 'temp_download', file_name)
+
+        @after_this_request
+        def cleanup(response):
+            shutil.rmtree('temp_chunks', ignore_errors=True)
+            shutil.rmtree('temp_download', ignore_errors=True)
+            os.makedirs('temp_chunks')
+            os.makedirs('temp_download')
+            return response
+
         return send_file(decrypted_file_path, as_attachment=True)
 
     except Exception as e:
         print(f"Error during decryption: {e}")
+        conn.close()
+        shutil.rmtree('temp_chunks', ignore_errors=True)
+        shutil.rmtree('temp_download', ignore_errors=True)
+        os.makedirs('temp_chunks')
+        os.makedirs('temp_download')
         return "Decryption failed", 500
-
-    # Delete all files in temp_chunks and temp_download after processing
-    shutil.rmtree('temp_chunks', ignore_errors=True)
-    shutil.rmtree('temp_download', ignore_errors=True)
-    os.makedirs('temp_chunks')
-    os.makedirs('temp_download')
+    
 
 def download_chunk(chunk_data):
     i, chunk_url = chunk_data
