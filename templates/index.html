@@ -17,13 +17,17 @@
     <hr class="my-4">
 
     <h2 class="text-center mb-4 text-white">File Table</h2>
+        <div class="search-bar mb-3">
+            <input type="text" class="form-control" id="searchInput" onkeyup="searchFiles()" placeholder="Search for files by name or ID...">
+        </div>
+
     <div class="table-responsive glass-morphism p-3">
-        <table class="table table-bordered glass-table">
+        <table class="table table-bordered glass-table" id="fileTable">
             <thead>
                 <tr>
-                    <th>ID</th>
-                    <th>File Name</th>
-                    <th>File Size</th>
+                    <th>ID <span class="filter-toggle" onclick="sortTable(0)">↑↓</span></th>
+                    <th>File Name <span class="filter-toggle" onclick="sortTable(1)">↑↓</span></th>
+                    <th>File Size <span class="filter-toggle" onclick="sortTable(2)">↑↓</span></th>
                     <th>Chunk Amount</th>
                     <th>Download</th>
                     <th>Delete</th>

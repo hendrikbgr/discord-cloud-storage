@@ -62,3 +62,27 @@ body {
   border-color: rgb(255 255 255 / 0%);
   --bs-table-color: white;
 }
+
+.form-control {
+  background-color: rgba(255, 255, 255, 0.3) !important;
+  border: none;
+  color: white;
+}
+
+/* Style for placeholder text */
+.form-control::placeholder {
+  color: white;
+  opacity: 1; /* Full opacity for placeholder */
+}
+
+/* Style for the input field when it is in focus */
+.form-control:focus {
+  background-color: rgba(255, 255, 255, 0.3) !important;
+  border: none;
+  color: white;
+  outline: none; /* Optionally remove the outline on focus */
+}
+
+.filter-toggle {
+  cursor: pointer;
+}
