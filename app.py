@@ -1,6 +1,6 @@
-from flask import Flask, render_template, request, send_file, redirect, url_for, after_this_request
-from Crypto.Cipher import AES
-from Crypto.Random import get_random_bytes
+from flask import Flask, render_template, request, send_file, redirect, url_for, after_this_request, flash, get_flashed_messages
+from Cryptodome.Cipher import AES 
+from Cryptodome.Random import get_random_bytes
 import os
 import sqlite3
 from datetime import datetime
@@ -15,6 +15,7 @@ import shutil
 
 
 app = Flask(__name__)
+app.secret_key = os.urandom(16)
 
 DATABASE_FILE = 'file_data.db'
 WEBHOOK_URL = 'https://discord.com/api/webhooks/1178788710800707655/XdM-0ESGAsMUXgN-ORy3oUWRuc6Ukd7DOjE1YQcr8qxsk-qCcW9AbVMQPX8_hBGLQySr'
@@ -108,7 +109,7 @@ def delete_file_entry(file_id):
     cursor.execute("DELETE FROM files WHERE id=?", (file_id,))
     conn.commit()
     conn.close()
-
+    flash('Deleted file from Database', 'success')
     return redirect(url_for('index'))
 
 @app.route('/download/<int:file_id>', methods=['GET'])
@@ -147,7 +148,6 @@ def download_and_decrypt(file_id):
             os.makedirs('temp_chunks')
             os.makedirs('temp_download')
             return response
-
         return send_file(decrypted_file_path, as_attachment=True)
 
     except Exception as e:
@@ -171,7 +171,6 @@ def download_chunk(chunk_data):
     else:
         print(f"Failed to download chunk {i + 1} from {chunk_url}")
         return None
-
 
 
 async def process_file(file_path):
@@ -216,21 +215,26 @@ def split_and_encrypt(input_file, output_directory, key):
 
     print(f'Successfully split and encrypted {input_file} into {num_chunks} chunks.')
 
-
+def upload_chunk(chunk_path):
+    try:
+        with open(chunk_path, 'rb') as file:
+            response = send_file_to_discord(file.read())
+        attachment_cdn_url = response.json()['attachments'][0]['url']
+        return attachment_cdn_url
+    except Exception as e:
+        print(f"Error sending file: {e}")
+        return None
 
 def upload_to_discord(output_directory):
+    chunks_paths = [os.path.join(output_directory, filename) for filename in sorted(os.listdir(output_directory)) if filename.endswith('.enc')]
+    
     chunks_urls = []
+    num_threads = 4  # Or any other number you deem appropriate
 
-    for filename in tqdm(sorted(os.listdir(output_directory)), desc='Uploading chunks', unit='chunk'):
-        if filename.endswith('.enc'):
-            chunk_path = os.path.join(output_directory, filename)
-            with open(chunk_path, 'rb') as file:
-                try:
-                    response = send_file_to_discord(file.read())
-                    attachment_cdn_url = response.json()['attachments'][0]['url']
-                    chunks_urls.append(attachment_cdn_url)
-                except Exception as e:
-                    print(f"Error sending file: {e}")
+    with concurrent.futures.ThreadPoolExecutor(max_workers=num_threads) as executor:
+        for chunk_url in tqdm(executor.map(upload_chunk, chunks_paths), desc='Uploading chunks', unit='chunk'):
+            if chunk_url:
+                chunks_urls.append(chunk_url)
 
     return chunks_urls
 
@@ -266,4 +270,4 @@ def save_to_database(input_file, chunks_urls, key_hex):
     print(f'Data saved to the database.')
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5001, debug=True)

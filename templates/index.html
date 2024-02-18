@@ -6,11 +6,14 @@
 {% block content %}
     <h1 class="text-center mb-4 text-white">File Upload and Table</h1>
 
-    <form action="{{ url_for('index') }}" method="post" enctype="multipart/form-data" class="glass-morphism p-4">
+    <form id="uploadForm" action="{{ url_for('index') }}" method="post" enctype="multipart/form-data" class="glass-morphism p-4">
         <div class="form-group">
             <label for="file" class="text-white">Choose File</label>
             <input type="file" class="form-control glass-input" name="file" id="file">
-            <button type="submit" class="btn btn-primary mt-3 glass-btn" id="uploadBtn">Upload</button>
+            <button type="submit" class="btn btn-primary mt-3 glass-btn" id="uploadBtn">
+                <span id="uploadBtnText">Upload</span>
+                <span id="uploadSpinner" class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+            </button>            
         </div>
     </form>
 

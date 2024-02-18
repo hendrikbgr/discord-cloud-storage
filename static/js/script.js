@@ -1,3 +1,14 @@
+document.getElementById('uploadForm').addEventListener('submit', function() {
+    var btn = document.getElementById('uploadBtn');
+    var text = document.getElementById('uploadBtnText');
+    var spinner = document.getElementById('uploadSpinner');
+
+    // Replace text with spinner and disable button
+    text.style.display = 'none';
+    spinner.style.display = '';
+    btn.disabled = true;
+});
+
 function searchFiles() {
     var input, filter, table, tr, td, i, txtValue;
     input = document.getElementById('searchInput');
@@ -65,3 +76,19 @@ function sortTable(columnIndex) {
         }
     }
 }
+
+document.addEventListener('DOMContentLoaded', (event) => {
+    setTimeout(function() {
+        let alerts = document.querySelectorAll('.alert');
+        alerts.forEach(function(alert) {
+            // Add the fade-out class
+            alert.classList.add('alert-fading-out');
+
+            // Wait for the fade-out to finish before closing
+            setTimeout(() => {
+                new bootstrap.Alert(alert).close();
+            }, 500); // This should match the duration in the CSS
+        });
+    }, 2000); // Time before starting the fade-out
+});
+
