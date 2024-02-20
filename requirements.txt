@@ -1,0 +1,13 @@
+Flask
+pycryptodomex
+os
+sqlite3
+datetime
+prettytable
+tqdm
+requests
+concurrent.futures
+asyncio
+time
+json
+shutil
