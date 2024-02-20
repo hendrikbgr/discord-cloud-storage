@@ -1,5 +1,7 @@
 # Discord Secure File Management System
 
+![Project Banner](/repo/banner.webp)
+
 ## Overview
 
 This project is a Flask-based web application designed for secure file management, including encryption, decryption, and storage functionalities. It leverages the Cryptodome library for cryptographic operations, SQLite for data storage, and integrates with Discord for file uploads. The application allows users to upload files, which are then split, encrypted, and stored securely. Files can be retrieved, decrypted, and downloaded through the web interface.
