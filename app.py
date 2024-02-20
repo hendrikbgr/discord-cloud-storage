@@ -12,13 +12,14 @@ import asyncio
 import time
 import json
 import shutil
+import env
 
 
 app = Flask(__name__)
 app.secret_key = os.urandom(16)
 
-DATABASE_FILE = 'file_data.db'
-WEBHOOK_URL = 'https://discord.com/api/webhooks/1178788710800707655/XdM-0ESGAsMUXgN-ORy3oUWRuc6Ukd7DOjE1YQcr8qxsk-qCcW9AbVMQPX8_hBGLQySr'
+DATABASE_FILE = env.DATABASE_FILE
+WEBHOOK_URL = env.WEBHOOK_URL
 PREFIX = '!'
 
 @app.route('/', methods=['GET', 'POST'])
@@ -101,6 +102,18 @@ async def fetch_file_information():
 
     return files_info
 
+def download_chunk(chunk_data):
+    i, chunk_url = chunk_data  # Unpack the tuple to get the index and URL
+    response = requests.get(chunk_url)
+    if response.status_code == 200:
+        chunk_filename = f'temp_chunks/chunk_{i + 1}.enc'  # Use index in filename for clarity
+        with open(chunk_filename, 'wb') as chunk_file:
+            chunk_file.write(response.content)
+        return (i, chunk_filename)  # Return a tuple of the index and filename
+    else:
+        print(f"Failed to download chunk {i + 1} from {chunk_url}")
+        return (i, None)  # Return the index and None if download failed
+
 @app.route('/delete/<int:file_id>', methods=['GET'])
 def delete_file_entry(file_id):
     conn = sqlite3.connect(DATABASE_FILE)
@@ -129,15 +142,15 @@ def download_and_decrypt(file_id):
 
     chunks_urls = chunk_list.split(', ')
 
-    num_threads = request.args.get('num_threads', default=4, type=int)
-
-    # Using ThreadPoolExecutor for concurrent downloading
-    with concurrent.futures.ThreadPoolExecutor(max_workers=num_threads) as executor:
-        downloaded_chunks = list(tqdm(executor.map(download_chunk, enumerate(chunks_urls)), desc='Downloading chunks', unit='chunk'))
+    downloaded_chunks = []
+    for i, chunk_url in enumerate(chunks_urls):
+        downloaded_chunk = download_chunk((i, chunk_url))
+        if downloaded_chunk[1] is not None:
+            downloaded_chunks.append(downloaded_chunk)
 
     try:
         print(f"Key from database: {key_hex}")
-        decrypt_and_reassemble(downloaded_chunks, file_name, key_hex)
+        decrypt_and_reassemble([chunk for index, chunk in sorted(downloaded_chunks)], file_name, key_hex)
         conn.close()
         decrypted_file_path = os.path.join(os.getcwd(), 'temp_download', file_name)
 
@@ -160,17 +173,16 @@ def download_and_decrypt(file_id):
         return "Decryption failed", 500
     
 
-def download_chunk(chunk_data):
-    i, chunk_url = chunk_data
-    response = requests.get(chunk_url)
-    if response.status_code == 200:
-        chunk_filename = f'temp_chunks/chunk_{i + 1}.enc'
-        with open(chunk_filename, 'wb') as chunk_file:
-            chunk_file.write(response.content)
-        return chunk_filename
-    else:
-        print(f"Failed to download chunk {i + 1} from {chunk_url}")
-        return None
+def upload_to_discord(output_directory):
+    chunks_paths = [os.path.join(output_directory, filename) for filename in sorted(os.listdir(output_directory)) if filename.endswith('.enc')]
+    
+    chunks_urls = []
+    for chunk_path in chunks_paths:
+        chunk_url = upload_chunk(chunk_path)
+        if chunk_url:
+            chunks_urls.append(chunk_url)
+
+    return chunks_urls
 
 
 async def process_file(file_path):
@@ -229,7 +241,7 @@ def upload_to_discord(output_directory):
     chunks_paths = [os.path.join(output_directory, filename) for filename in sorted(os.listdir(output_directory)) if filename.endswith('.enc')]
     
     chunks_urls = []
-    num_threads = 4  # Or any other number you deem appropriate
+    num_threads = 1  # Or any other number you deem appropriate
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=num_threads) as executor:
         for chunk_url in tqdm(executor.map(upload_chunk, chunks_paths), desc='Uploading chunks', unit='chunk'):
@@ -248,6 +260,7 @@ def send_file_to_discord(file_content):
 
 def save_to_database(input_file, chunks_urls, key_hex):
     file_size = os.path.getsize(input_file)
+    print(f'File size: {file_size} bytes')
     upload_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
     conn = sqlite3.connect(DATABASE_FILE)
