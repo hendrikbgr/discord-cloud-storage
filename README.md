@@ -14,6 +14,10 @@ This project is a Flask-based web application designed for secure file managemen
 - Automated clean-up of temporary files.
 - Discord webhook integration for file upload notifications.
 
+## Screenshot (webui)
+
+![Web UI](/repo/webui.png)
+
 ## Requirements
 
 - Python 3.x
