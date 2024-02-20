@@ -1,4 +1,4 @@
-![Project Banner](/repo/banner.webp)
+![Project Banner](/repo/banner.png)
 
 ## Overview
 
