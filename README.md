@@ -1,5 +1,3 @@
-# Discord Secure File Management System
-
 ![Project Banner](/repo/banner.webp)
 
 ## Overview
