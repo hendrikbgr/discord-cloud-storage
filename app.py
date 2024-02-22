@@ -56,7 +56,6 @@ def numerical_sort_key(filename):
 
 def decrypt_and_reassemble(chunk_filenames, output_file, key_hex):
     key = bytes.fromhex(key_hex)
-    print("Key:", key)
     chunks = []
 
     # Sort files by the numerical part of their names
@@ -113,7 +112,6 @@ def download_chunk(chunk_data):
         chunk_filename = f'temp_chunks/chunk_{i + 1}.enc'  # Use index in filename for clarity
         with open(chunk_filename, 'wb') as chunk_file:
             chunk_file.write(response.content)
-        print("Download of chunk successful...")
         return (i, chunk_filename)  # Return a tuple of the index and filename
     else:
         print(f"Failed to download chunk {i + 1} from {chunk_url}")
@@ -148,7 +146,9 @@ def download_and_decrypt(file_id):
     indexed_chunks_urls = list(enumerate(chunks_urls))
     downloaded_chunks = [None] * len(chunks_urls)  # Preallocate list with placeholders
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:  # Adjust number of workers as necessary
+    total_chunks = len(chunks_urls)  # Total number of chunks to download
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor, tqdm(total=total_chunks, desc='Downloading chunks', unit='chunk') as progress_bar:  # Adjust number of workers as necessary
         future_to_index = {executor.submit(download_chunk, (i, url)): i for i, url in indexed_chunks_urls}
 
         for future in concurrent.futures.as_completed(future_to_index):
@@ -159,6 +159,8 @@ def download_and_decrypt(file_id):
                     downloaded_chunks[index] = result
             except Exception as exc:
                 print(f'Chunk download generated an exception: {exc}')
+            finally:
+                progress_bar.update(1)  # Update the progress bar
 
     # Filter out None values in case some downloads failed
     downloaded_chunks = [chunk for chunk in downloaded_chunks if chunk is not None]
@@ -192,31 +194,28 @@ def download_and_decrypt(file_id):
 
 def upload_to_discord(output_directory):
     print("Uploading chunks to Discord...")
-    chunks_paths = [os.path.join(output_directory, filename) for filename in sorted(os.listdir(output_directory)) if filename.endswith('.enc')]
-    
-    indexed_chunk_paths = [(i, path) for i, path in enumerate(chunks_paths)]
-    chunks_urls = [None] * len(chunks_paths)  # Preallocate list
+    chunks_paths = [os.path.join(output_directory, filename) for filename in sorted(os.listdir(output_directory), key=lambda f: int(re.search(r'(\d+)', f).group())) if filename.endswith('.enc')]
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:  # Adjust as necessary
+    indexed_chunk_paths = [(i, path) for i, path in enumerate(chunks_paths)]
+    chunks_urls = [None] * len(chunks_paths)  # Preallocate list with placeholders
+
+    total_chunks = len(chunks_paths)  # Total number of chunks for the progress bar
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor, tqdm(total=total_chunks, desc='Uploading chunks', unit='chunk') as progress_bar:
         future_to_index = {executor.submit(upload_chunk, path): index for index, path in indexed_chunk_paths}
 
-        # Debugging: Print statements to show when each upload starts and finishes
-        print("Submitting upload tasks...")
         for future in concurrent.futures.as_completed(future_to_index):
-            index = future_to_index[future]
-            print(f"Task for chunk {index + 1} completed")
+            index = future_to_index[future]  # Get original index
             try:
-                chunk_url = future.result()
-                print(f"Received URL for chunk {index + 1}: {chunk_url}")
+                chunk_url = future.result()  # Get the result from the future
                 if chunk_url:
-                    chunks_urls[index] = chunk_url
+                    chunks_urls[index] = chunk_url  # Assign URL to correct position based on original index
             except Exception as exc:
                 print(f'Chunk upload generated an exception: {exc}')
+            finally:
+                progress_bar.update(1)
 
-    # Filter out None values in case some uploads failed
-    return [url for url in chunks_urls if url is not None]
-
-
+    return chunks_urls
 
 
 async def process_file(file_path):
@@ -270,32 +269,6 @@ def upload_chunk(chunk_path):
     except Exception as e:
         print(f"Error sending file: {e}")
         return None
-
-def upload_to_discord(output_directory):
-    print("Uploading chunks to Discord...")
-    chunks_paths = [os.path.join(output_directory, filename) for filename in sorted(os.listdir(output_directory), key=lambda f: int(re.search(r'(\d+)', f).group())) if filename.endswith('.enc')]
-
-    indexed_chunk_paths = [(i, path) for i, path in enumerate(chunks_paths)]
-    chunks_urls = [None] * len(chunks_paths)  # Preallocate list with placeholders
-
-    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:  # Adjust as necessary
-        # Maintain a dictionary of future to index based on original order
-        future_to_index = {executor.submit(upload_chunk, path): index for index, path in indexed_chunk_paths}
-
-        # Collecting results in the order of submission
-        for future in concurrent.futures.as_completed(future_to_index):
-            index = future_to_index[future]  # Get original index
-            try:
-                chunk_url = future.result()  # Get the result from the future
-                if chunk_url:
-                    chunks_urls[index] = chunk_url
-                print("Upload of chunk successful...")  # Assign URL to correct position based on original index
-            except Exception as exc:
-                print(f'Chunk upload generated an exception: {exc}')
-
-    # Here, no need to filter out None values as it would distort the order
-    # But ensure to handle any None values appropriately in later processes
-    return chunks_urls
 
 
 
