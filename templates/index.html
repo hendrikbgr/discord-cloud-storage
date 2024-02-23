@@ -4,7 +4,7 @@
 {% block title %}File Upload and Table{% endblock %}
 
 {% block content %}
-    <h1 class="text-center mb-4 text-white">File Upload and Table</h1>
+    <h1 class="text-center mb-4 mt-4 text-white">File Upload and Table</h1>
 
     <form id="uploadForm" action="{{ url_for('index') }}" method="post" enctype="multipart/form-data" class="glass-morphism p-4">
         <div class="form-group">
@@ -24,7 +24,7 @@
             <input type="text" class="form-control" id="searchInput" onkeyup="searchFiles()" placeholder="Search for files by name or ID...">
         </div>
 
-    <div class="table-responsive glass-morphism p-3">
+    <div class="table-responsive glass-morphism p-3 mb-5">
         <table class="table table-bordered glass-table" id="fileTable">
             <thead>
                 <tr>
