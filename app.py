@@ -180,8 +180,8 @@ def download_and_decrypt(file_id):
         def cleanup(response):
             shutil.rmtree('temp_chunks', ignore_errors=True)
             shutil.rmtree('temp_download', ignore_errors=True)
-            os.makedirs('temp_chunks')
-            os.makedirs('temp_download')
+            os.makedirs('temp_chunks', exist_ok=True)  # Modified line
+            os.makedirs('temp_download', exist_ok=True)  # Modified line
             return response
         return send_file(decrypted_file_path, as_attachment=True)
 
@@ -190,9 +190,10 @@ def download_and_decrypt(file_id):
         conn.close()
         shutil.rmtree('temp_chunks', ignore_errors=True)
         shutil.rmtree('temp_download', ignore_errors=True)
-        os.makedirs('temp_chunks')
-        os.makedirs('temp_download')
+        os.makedirs('temp_chunks', exist_ok=True)  # Modified line
+        os.makedirs('temp_download', exist_ok=True)  # Modified line
         return "Decryption failed", 500
+
 
     
 
