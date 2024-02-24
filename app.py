@@ -14,6 +14,7 @@ import json
 import shutil
 import env
 import re
+import platform
 
 
 app = Flask(__name__)
@@ -23,24 +24,28 @@ DATABASE_FILE = env.DATABASE_FILE
 WEBHOOK_URL = env.WEBHOOK_URL
 PREFIX = '!'
 
+FILE_PATH_SEP = '\\' if platform.system() == 'Windows' else '/'
+
+def create_path(*args):
+    """Create a file path suitable for the current operating system."""
+    return FILE_PATH_SEP.join(args)
+
 @app.route('/', methods=['GET', 'POST'])
 def index():
     if request.method == 'POST':
         file = request.files['file']
         if file:
-            file_path = 'temp_upload/' + file.filename
+            file_path = create_path('temp_upload', file.filename)
             file.save(file_path)
             asyncio.run(process_file(file_path))
             # Delete all files in temp_chunks and temp_upload after processing
-            shutil.rmtree('temp_chunks', ignore_errors=True)
-            shutil.rmtree('temp_upload', ignore_errors=True)
-            os.makedirs('temp_chunks')
-            os.makedirs('temp_upload')
+            shutil.rmtree(create_path('temp_chunks'), ignore_errors=True)
+            shutil.rmtree(create_path('temp_upload'), ignore_errors=True)
+            os.makedirs(create_path('temp_chunks'))
+            os.makedirs(create_path('temp_upload'))
 
     files_info = asyncio.run(fetch_file_information())
-
-
-    return render_template('index.html',files_info=files_info)
+    return render_template('index.html', files_info=files_info)
 
 def convert_bytes(byte_size):
     for unit in ['B', 'KB', 'MB', 'GB']:
@@ -102,7 +107,6 @@ async def fetch_file_information():
             'formatted_size': formatted_size,
             'chunk_amount': chunk_amount
         })
-
     return files_info
 
 def download_chunk(chunk_data):
