@@ -201,25 +201,41 @@ def upload_to_discord(output_directory):
     chunks_paths = [os.path.join(output_directory, filename) for filename in sorted(os.listdir(output_directory), key=lambda f: int(re.search(r'(\d+)', f).group())) if filename.endswith('.enc')]
 
     indexed_chunk_paths = [(i, path) for i, path in enumerate(chunks_paths)]
-    chunks_urls = [None] * len(chunks_paths)  # Preallocate list with placeholders
+    chunks_urls = [None] * len(chunks_paths)  # Preallocate list with None to maintain order
 
     total_chunks = len(chunks_paths)  # Total number of chunks for the progress bar
+    max_retries = 5  # Set maximum number of retries for each chunk
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor, tqdm(total=total_chunks, desc='Uploading chunks', unit='chunk') as progress_bar:
+        # Initial upload attempts
         future_to_index = {executor.submit(upload_chunk, path): index for index, path in indexed_chunk_paths}
 
         for future in concurrent.futures.as_completed(future_to_index):
-            index = future_to_index[future]  # Get original index
-            try:
-                chunk_url = future.result()  # Get the result from the future
-                if chunk_url:
-                    chunks_urls[index] = chunk_url  # Assign URL to correct position based on original index
-            except Exception as exc:
-                print(f'Chunk upload generated an exception: {exc}')
-            finally:
-                progress_bar.update(1)
+            index = future_to_index[future]
+            retries = 0
+            while retries < max_retries:
+                try:
+                    chunk_url = future.result()
+                    if chunk_url:
+                        chunks_urls[index] = chunk_url  # Assign URL to correct position based on original index
+                        break  # Exit retry loop if upload was successful
+                except Exception as exc:
+                    print(f'Chunk upload generated an exception: {exc}')
+                    retries += 1
+                    if retries < max_retries:
+                        print(f"Retrying upload for chunk {index + 1}, attempt {retries + 1}")
+                        # Re-submit the failed upload task
+                        future = executor.submit(upload_chunk, indexed_chunk_paths[index][1])
+                finally:
+                    progress_bar.update(1)
+
+    # Check if there are any chunks that failed all retries and handle them as needed
+    if None in chunks_urls:
+        print("Some chunks failed to upload after multiple attempts.")
+        # You can add additional error handling here, such as raising an exception or notifying the user.
 
     return chunks_urls
+
 
 
 async def process_file(file_path):
@@ -264,15 +280,23 @@ def split_and_encrypt(input_file, output_directory, key):
 
     print(f'Successfully split and encrypted {input_file} into {num_chunks} chunks.')
 
-def upload_chunk(chunk_path):
-    try:
-        with open(chunk_path, 'rb') as file:
-            response = send_file_to_discord(file.read())
-        attachment_cdn_url = response.json()['attachments'][0]['url']
-        return attachment_cdn_url
-    except Exception as e:
-        print(f"Error sending file: {e}")
-        return None
+def upload_chunk(chunk_path, max_retries=5):
+    retry_count = 0
+    while retry_count < max_retries:
+        try:
+            with open(chunk_path, 'rb') as file:
+                response = send_file_to_discord(file.read())
+                if response.status_code == 200:  # Check if request was successful
+                    attachment_cdn_url = response.json()['attachments'][0]['url']
+                    return attachment_cdn_url
+                else:
+                    raise Exception(f"Upload failed with status code: {response.status_code}")
+        except Exception as e:
+            print(f"Error sending file: {e}, retrying...")
+            retry_count += 1
+            time.sleep(1)  # Wait a second before retrying to avoid hitting rate limits
+    return None
+
 
 
 
