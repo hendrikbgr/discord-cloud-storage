@@ -28,6 +28,8 @@ def index():
     if request.method == 'POST':
         file = request.files['file']
         if file:
+            if not os.path.exists('temp_upload'):
+                os.makedirs('temp_upload')
             file_path = 'temp_upload/' + file.filename
             file.save(file_path)
             asyncio.run(process_file(file_path))
@@ -176,8 +178,8 @@ def download_and_decrypt(file_id):
         def cleanup(response):
             shutil.rmtree('temp_chunks', ignore_errors=True)
             shutil.rmtree('temp_download', ignore_errors=True)
-            os.makedirs('temp_chunks')
-            os.makedirs('temp_download')
+            os.makedirs('temp_chunks', exist_ok=True)  # This will not raise an error if the directory already exists
+            os.makedirs('temp_download', exist_ok=True)  # Same as above
             return response
         return send_file(decrypted_file_path, as_attachment=True)
 
