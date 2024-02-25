@@ -334,4 +334,4 @@ def save_to_database(input_file, chunks_urls, key_hex):
     print(f'Data saved to the database.')
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5001, debug=True)
+    app.run(host='0.0.0.0', port=5001)
