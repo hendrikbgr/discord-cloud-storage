@@ -14,6 +14,7 @@ import json
 import shutil
 import env
 import re
+import platform
 
 
 app = Flask(__name__)
@@ -22,6 +23,12 @@ app.secret_key = os.urandom(16)
 DATABASE_FILE = env.DATABASE_FILE
 WEBHOOK_URL = env.WEBHOOK_URL
 PREFIX = '!'
+
+FILE_PATH_SEP = '\\' if platform.system() == 'Windows' else '/'
+
+def create_path(*args):
+    """Create a file path suitable for the current operating system."""
+    return FILE_PATH_SEP.join(args)
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
@@ -34,15 +41,13 @@ def index():
             file.save(file_path)
             asyncio.run(process_file(file_path))
             # Delete all files in temp_chunks and temp_upload after processing
-            shutil.rmtree('temp_chunks', ignore_errors=True)
-            shutil.rmtree('temp_upload', ignore_errors=True)
-            os.makedirs('temp_chunks')
-            os.makedirs('temp_upload')
+            shutil.rmtree(create_path('temp_chunks'), ignore_errors=True)
+            shutil.rmtree(create_path('temp_upload'), ignore_errors=True)
+            os.makedirs(create_path('temp_chunks'))
+            os.makedirs(create_path('temp_upload'))
 
     files_info = asyncio.run(fetch_file_information())
-
-
-    return render_template('index.html',files_info=files_info)
+    return render_template('index.html', files_info=files_info)
 
 def convert_bytes(byte_size):
     for unit in ['B', 'KB', 'MB', 'GB']:
@@ -104,7 +109,6 @@ async def fetch_file_information():
             'formatted_size': formatted_size,
             'chunk_amount': chunk_amount
         })
-
     return files_info
 
 def download_chunk(chunk_data):
@@ -188,9 +192,10 @@ def download_and_decrypt(file_id):
         conn.close()
         shutil.rmtree('temp_chunks', ignore_errors=True)
         shutil.rmtree('temp_download', ignore_errors=True)
-        os.makedirs('temp_chunks')
-        os.makedirs('temp_download')
+        os.makedirs('temp_chunks', exist_ok=True)  # Modified line
+        os.makedirs('temp_download', exist_ok=True)  # Modified line
         return "Decryption failed", 500
+
 
     
 
@@ -199,25 +204,41 @@ def upload_to_discord(output_directory):
     chunks_paths = [os.path.join(output_directory, filename) for filename in sorted(os.listdir(output_directory), key=lambda f: int(re.search(r'(\d+)', f).group())) if filename.endswith('.enc')]
 
     indexed_chunk_paths = [(i, path) for i, path in enumerate(chunks_paths)]
-    chunks_urls = [None] * len(chunks_paths)  # Preallocate list with placeholders
+    chunks_urls = [None] * len(chunks_paths)  # Preallocate list with None to maintain order
 
     total_chunks = len(chunks_paths)  # Total number of chunks for the progress bar
+    max_retries = 5  # Set maximum number of retries for each chunk
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor, tqdm(total=total_chunks, desc='Uploading chunks', unit='chunk') as progress_bar:
+        # Initial upload attempts
         future_to_index = {executor.submit(upload_chunk, path): index for index, path in indexed_chunk_paths}
 
         for future in concurrent.futures.as_completed(future_to_index):
-            index = future_to_index[future]  # Get original index
-            try:
-                chunk_url = future.result()  # Get the result from the future
-                if chunk_url:
-                    chunks_urls[index] = chunk_url  # Assign URL to correct position based on original index
-            except Exception as exc:
-                print(f'Chunk upload generated an exception: {exc}')
-            finally:
-                progress_bar.update(1)
+            index = future_to_index[future]
+            retries = 0
+            while retries < max_retries:
+                try:
+                    chunk_url = future.result()
+                    if chunk_url:
+                        chunks_urls[index] = chunk_url  # Assign URL to correct position based on original index
+                        break  # Exit retry loop if upload was successful
+                except Exception as exc:
+                    print(f'Chunk upload generated an exception: {exc}')
+                    retries += 1
+                    if retries < max_retries:
+                        print(f"Retrying upload for chunk {index + 1}, attempt {retries + 1}")
+                        # Re-submit the failed upload task
+                        future = executor.submit(upload_chunk, indexed_chunk_paths[index][1])
+                finally:
+                    progress_bar.update(1)
+
+    # Check if there are any chunks that failed all retries and handle them as needed
+    if None in chunks_urls:
+        print("Some chunks failed to upload after multiple attempts.")
+        # You can add additional error handling here, such as raising an exception or notifying the user.
 
     return chunks_urls
+
 
 
 async def process_file(file_path):
@@ -262,15 +283,23 @@ def split_and_encrypt(input_file, output_directory, key):
 
     print(f'Successfully split and encrypted {input_file} into {num_chunks} chunks.')
 
-def upload_chunk(chunk_path):
-    try:
-        with open(chunk_path, 'rb') as file:
-            response = send_file_to_discord(file.read())
-        attachment_cdn_url = response.json()['attachments'][0]['url']
-        return attachment_cdn_url
-    except Exception as e:
-        print(f"Error sending file: {e}")
-        return None
+def upload_chunk(chunk_path, max_retries=5):
+    retry_count = 0
+    while retry_count < max_retries:
+        try:
+            with open(chunk_path, 'rb') as file:
+                response = send_file_to_discord(file.read())
+                if response.status_code == 200:  # Check if request was successful
+                    attachment_cdn_url = response.json()['attachments'][0]['url']
+                    return attachment_cdn_url
+                else:
+                    raise Exception(f"Upload failed with status code: {response.status_code}")
+        except Exception as e:
+            print(f"Error sending file: {e}, retrying...")
+            retry_count += 1
+            time.sleep(1)  # Wait a second before retrying to avoid hitting rate limits
+    return None
+
 
 
 
@@ -307,4 +336,4 @@ def save_to_database(input_file, chunks_urls, key_hex):
     print(f'Data saved to the database.')
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5001, debug=True)
+    app.run(host='0.0.0.0', port=5001)
