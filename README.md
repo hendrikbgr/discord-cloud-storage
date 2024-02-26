@@ -29,6 +29,9 @@ This project is a Flask-based web application designed for secure file managemen
 - requests
 - asyncio
 
+## ⚠️ Warning! ⚠️
+Do not use this to store important data. Your data might get deleted in future updates by discord. This is for educational purposes or for unimportant files. 
+
 ## Installation
 
 1.  Clone the repository to your local machine:
