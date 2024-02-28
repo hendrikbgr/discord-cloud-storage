@@ -1,4 +1,3 @@
-<!-- index.html -->
 {% extends "base.html" %}
 
 {% block title %}File Upload and Table{% endblock %}
@@ -13,24 +12,30 @@
             <button type="submit" class="btn btn-primary mt-3 glass-btn" id="uploadBtn">
                 <span id="uploadBtnText">Upload</span>
                 <span id="uploadSpinner" class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
-            </button>            
+            </button>
         </div>
     </form>
 
     <hr class="my-4">
 
     <h2 class="text-center mb-4 text-white">File Table</h2>
-        <div class="search-bar mb-3">
-            <input type="text" class="form-control" id="searchInput" onkeyup="searchFiles()" placeholder="Search for files by name or ID...">
-        </div>
+    <div class="search-bar mb-3">
+        <input type="text" class="form-control" id="searchInput" onkeyup="searchFiles()" placeholder="Search for files by name or ID...">
+    </div>
+
+    <!-- Select All / Deselect All Button -->
+    <button type="button" class="btn btn-secondary mb-2 glass-btn" onclick="toggleSelectAll()">Select All / Deselect All</button>
+    <button type="button" class="btn btn-secondary mb-2 glass-btn" onclick="startExport()">Export</button>
+    <button type="button" class="btn btn-secondary mb-2 glass-btn" onclick="startImport()">Import</button>
 
     <div class="table-responsive glass-morphism p-3 mb-5">
         <table class="table table-bordered glass-table" id="fileTable">
             <thead>
                 <tr>
-                    <th>ID <span class="filter-toggle" onclick="sortTable(0)">↑↓</span></th>
-                    <th>File Name <span class="filter-toggle" onclick="sortTable(1)">↑↓</span></th>
-                    <th>File Size <span class="filter-toggle" onclick="sortTable(2)">↑↓</span></th>
+                    <th><input type="checkbox" id="selectAllCheckbox" onclick="toggleTableCheckboxes(this)"></th> <!-- Add this line for select all checkbox -->
+                    <th>ID <span class="filter-toggle" onclick="sortTable(1)">↑↓</span></th>
+                    <th>File Name <span class="filter-toggle" onclick="sortTable(2)">↑↓</span></th>
+                    <th>File Size <span class="filter-toggle" onclick="sortTable(3)">↑↓</span></th>
                     <th>Chunk Amount</th>
                     <th>Download</th>
                     <th>Delete</th>
@@ -39,6 +44,7 @@
             <tbody>
                 {% for file_info in files_info %}
                     <tr>
+                        <td><input type="checkbox" class="file-checkbox" data-file-id="{{ file_info.id }}"></td> <!-- Add this line for checkboxes -->
                         <td>{{ file_info.id }}</td>
                         <td>{{ file_info.file_name }}</td>
                         <td>{{ file_info.formatted_size }}</td>

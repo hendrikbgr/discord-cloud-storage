@@ -1,3 +1,8 @@
 env.py
 file_data.db
 __pycache__/*
+/temp_chunks/*
+/temp_download/*
+/temp_upload/*
+/temp_import/*
+/temp_export/*

@@ -1,4 +1,5 @@
 from flask import Flask, render_template, request, send_file, redirect, url_for, after_this_request, flash, get_flashed_messages
+from flask import Response
 from Cryptodome.Cipher import AES 
 from Cryptodome.Random import get_random_bytes
 import os
@@ -87,6 +88,126 @@ def decrypt_and_reassemble(chunk_filenames, output_file, key_hex):
 
     print(f'Successfully decrypted and reassembled chunks into {output_file_path}.')
 
+@app.route('/export', methods=['POST'])
+def export_files():
+    # Get the selected file IDs from the request
+    selected_ids = request.form.getlist('selected_ids[]')
+
+    # Create a new database for exporting
+    export_db_directory = 'temp_export'
+    export_db_path = os.path.join(export_db_directory, 'exported_files.db')
+    if not os.path.exists(export_db_directory):
+        os.makedirs(export_db_directory)
+    # Ensure the database is new by removing it if it already exists
+    if os.path.exists(export_db_path):
+        os.remove(export_db_path)
+
+    conn = sqlite3.connect(export_db_path)
+    cursor = conn.cursor()
+
+    # Create the same table structure
+    cursor.execute('''CREATE TABLE IF NOT EXISTS files 
+                      (id INTEGER PRIMARY KEY AUTOINCREMENT, 
+                      file_name TEXT, 
+                      chunk_list TEXT, 
+                      key_hex TEXT, 
+                      file_size INTEGER, 
+                      upload_date TEXT)''')
+
+    # Copy selected file information from the main database to the export database
+    main_conn = sqlite3.connect(DATABASE_FILE)
+    main_cursor = main_conn.cursor()
+    for file_id in selected_ids:
+        main_cursor.execute("SELECT file_name, chunk_list, key_hex, file_size, upload_date FROM files WHERE id=?", (file_id,))
+        file_info = main_cursor.fetchone()
+        if file_info:
+            cursor.execute("INSERT INTO files (file_name, chunk_list, key_hex, file_size, upload_date) VALUES (?, ?, ?, ?, ?)", file_info)
+
+    # Close both databases
+    main_conn.close()
+    conn.commit()
+    conn.close()
+
+    # Flash success message for the export
+    flash('Files exported successfully!', 'success')
+
+    # Send the new database file to the user
+    return send_file(export_db_path, as_attachment=True, download_name='exported_files.db', mimetype='application/octet-stream')
+
+@app.route('/import', methods=['POST'])
+def import_db():
+    # delete all files in temp_import after processing
+    if os.path.exists('temp_import'):
+        shutil.rmtree(create_path('temp_import'), ignore_errors=True)
+
+    # Check if there is a file in the request
+    if 'db_file' not in request.files:
+        flash('No file part', 'error')
+        return redirect(request.url)
+
+    file = request.files['db_file']
+    if file.filename == '':
+        flash('No selected file', 'error')
+        return redirect(request.url)
+
+    # Ensure the file is a valid SQLite database by checking its extension
+    if file and file.filename.endswith('.db'):
+        # Save the uploaded file temporarily
+        temp_path = os.path.join('temp_import', file.filename)
+        if not os.path.exists('temp_import'):
+            os.makedirs('temp_import')
+        file.save(temp_path)
+
+        # Now, validate and merge the database
+        try:
+            validate_and_merge_db(temp_path)
+            flash('Database imported successfully!', 'success')
+        except Exception as e:
+            flash(str(e), 'error')
+            return redirect(url_for('index'))
+
+        return redirect(url_for('index'))
+    else:
+        flash('Invalid file format', 'error')
+        return redirect(url_for('index'))
+
+
+def validate_and_merge_db(import_path):
+    # Connect to the existing and the imported databases
+    conn_existing = sqlite3.connect(DATABASE_FILE)
+    conn_import = sqlite3.connect(import_path)
+    
+    # Get the schema from both databases
+    schema_existing = conn_existing.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='files'").fetchone()
+    schema_import = conn_import.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='files'").fetchone()
+    
+    # Check if the schemas are the same
+    if schema_existing != schema_import:
+        raise Exception("The structure of the imported database does not match the existing one.")
+    
+    # If they match, proceed with checking and merging the databases
+    conn_existing.executescript(f"ATTACH DATABASE '{import_path}' AS imported_db")
+    conn_existing.execute("BEGIN")
+    
+    # Check and insert the records that do not exist in the existing database
+    cursor_existing = conn_existing.cursor()
+    cursor_import = conn_import.cursor()
+    cursor_import.execute("SELECT * FROM files")
+    for row in cursor_import.fetchall():
+        # Here, you need to adjust the query according to your table's unique identifier or combination of columns
+        # This example uses 'file_name' as a unique identifier; adjust it based on your actual data structure
+        if not cursor_existing.execute("SELECT 1 FROM files WHERE file_name = ?", (row[1],)).fetchone():
+            cursor_existing.execute("INSERT INTO files (file_name, chunk_list, key_hex, file_size, upload_date) VALUES (?, ?, ?, ?, ?)", row[1:])
+            print(f'Imported new record: {row[1]}')  # Adjust based on your table structure
+        else:
+            print(f'Record already exists and was not imported: {row[1]}')  # Adjust based on your table structure
+
+    conn_existing.execute("COMMIT")
+    conn_existing.execute("DETACH DATABASE imported_db")
+    
+    # Close the connections
+    conn_existing.close()
+    conn_import.close()
 
 
 
