@@ -76,6 +76,10 @@ Do not use this to store important data. Your data might get deleted in future u
 
 Files are encrypted using AES with EAX mode for combined confidentiality and authenticity. Upon uploading, files are split into chunks, encrypted, and stored. For downloading, encrypted chunks are fetched, decrypted, and reassembled.
 
+## Import & Export
+
+Files that you have upload can be selected and then exported. The exported file then can be importet by a different user. That enables the second user to download the files that you have uploaded.
+
 ## Discord Integration
 
 Files are uploaded to Discord through webhooks for ease of access and notification. Ensure your webhook URL is correctly configured in the `WEBHOOK_URL` variable.
