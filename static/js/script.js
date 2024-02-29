@@ -18,9 +18,9 @@ function searchFiles() {
 
     for (i = 0; i < tr.length; i++) {
         // Get the first cell (ID)
-        tdId = tr[i].getElementsByTagName('td')[0];
+        tdId = tr[i].getElementsByTagName('td')[1];
         // Get the second cell (File Name)
-        tdName = tr[i].getElementsByTagName('td')[1];
+        tdName = tr[i].getElementsByTagName('td')[2];
 
         if (tdId || tdName) {
             txtValueId = tdId ? tdId.textContent || tdId.innerText : "";
